@@ -1,0 +1,23 @@
+SHELL=/bin/bash
+CONDAROOT = ~/miniconda3
+
+init:
+		@echo "Creating local conda env from yaml..."
+		conda init bash && \
+		source ~/miniconda3/etc/profile.d/conda.sh && \
+		conda env create -f environment.yaml --prefix ./envs
+
+init_fresh:
+		@echo "Creating local conda env from scratch..."
+		conda init bash && \
+		source ~/miniconda3/etc/profile.d/conda.sh && \
+		conda create --prefix ./envs -y python=3.8 numpy pandas matplotlib scikit-learn tqdm requests pylint autopep8 && \
+		conda activate ./envs && \
+		conda install -yc pytorch pytorch torchvision cudatoolkit=10.1 && \
+		conda install -yc conda-forge pytorch-lightning tensorboard && \
+		conda install -c conda-forge pytorch_geometric && \
+		conda env export | grep -v "^prefix: " > environment.yaml
+
+clean:
+		@echo "Cleaning up..."
+		rm -rf ./envs
