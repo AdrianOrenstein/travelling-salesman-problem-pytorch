@@ -16,6 +16,11 @@ init_fresh:
 		conda install -yc pytorch pytorch torchvision cudatoolkit=10.1 && \
 		conda install -yc conda-forge pytorch-lightning tensorboard && \
 		conda install -c conda-forge pytorch_geometric && \
+		conda install -c anaconda cython && \
+		git clone https://github.com/jvkersch/pyconcorde && \
+		cd pyconcorde && \
+		pip install -e . && \
+		cd .. && \
 		conda env export | grep -v "^prefix: " > environment.yaml
 
 clean:

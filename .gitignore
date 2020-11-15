@@ -4,3 +4,9 @@ envs/
 __pycache__/
 
 .vscode/
+
+data/
+
+*.res
+
+*.sol

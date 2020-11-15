@@ -1,9 +1,11 @@
 import random
-import requests
-
-
-from scipy.spatial import distance
 from typing import *
+
+import numpy as np
+import requests
+import scipy
+from scipy import spatial
+import torch
 from tqdm.autonotebook import tqdm
 
 
@@ -25,12 +27,31 @@ class DefaultTSPSolver:
 
     def _calculate_path_cost(self, city_indexes: List[Union[float, int]]):
         return sum(
-            distance.euclidean(self.city_locations[a], self.city_locations[b])
+            scipy.spatial.distance.euclidean(
+                self.city_locations[a], self.city_locations[b])
             for a, b in zip(
-                city_indexes + [city_indexes[-1]
-                                ], city_indexes[1:] + [city_indexes[0]]
+                city_indexes + [city_indexes[-1]],
+                city_indexes[1:] + [city_indexes[0]]
             )
         )
+
+    def _build_adjacency_matrix(self, locations: List[List[Union[float, int]]]) -> torch.FloatTensor:
+        """
+
+        """
+        locations = np.array(locations)
+
+        adj_matrix = spatial.distance.cdist(locations, locations)
+
+        return torch.FloatTensor(adj_matrix)
+
+    def _normalise_city_distances(self, adjacency_matrix: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Normalise distances between 0 and 1
+
+        """
+        normalised_adj_matrix = adjacency_matrix / adjacency_matrix.sum(1)
+        return normalised_adj_matrix
 
     def run(self):
         path = list(range(len(self.city_locations)))
