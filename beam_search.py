@@ -24,19 +24,19 @@ class BeamSearchSolver(DefaultTSPSolver):
                 self.city_locations[a], self.city_locations[b])
 
     def _eval_beam_search(self, u: int, ll: int, branch: List[int], visited: Set[int], g: List[int], beam_size: int, cost_so_far: float = 0):
-        visited.add(u)
+        visited[u] = True
         branch.append(u)
         if len(branch) == ll:  # if length of branch equals length of string, print the branch
             yield branch.copy()
         else:
-            neighbours = [n for n in g if n not in visited]
+            neighbours = [n for n in g if not visited[n]]
             travel_costs = [cost_so_far + self.partial_calc_path_cost(branch[-1], n) for n in neighbours]
             neighbours_and_cost = sorted(zip(neighbours, travel_costs), key=lambda pair: pair[1])
             
             for n, cost in neighbours_and_cost[:beam_size]:
                 yield from self._eval_beam_search(n, ll, branch, visited, g, beam_size, cost_so_far+cost)
         # backtrack
-        visited.remove(u)
+        visited[u] = False
         branch.remove(u)
 
     def run(self,):
@@ -45,7 +45,7 @@ class BeamSearchSolver(DefaultTSPSolver):
 
         best_path_cost = float('inf')
         branch = []
-        visited = set()
+        visited = [False for _ in range(self.adjacency_matrix.shape[0])]
         for starting_node in range(len(self.adjacency_matrix)):
             path_generator = self._eval_beam_search(
                 starting_node, len(self.adjacency_matrix), branch, visited,
