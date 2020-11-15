@@ -10,3 +10,7 @@ data/
 *.res
 
 *.sol
+
+.ipynb_checkpoints/
+
+pyconcorde/
