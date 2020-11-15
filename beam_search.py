@@ -15,29 +15,26 @@ class BeamSearchSolver(DefaultTSPSolver):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        # np.random.seed(seed=0)
-        # self.city_locations = np.random.rand(21, 10)
-
         self.adjacency_matrix = torch.softmax(self._build_adjacency_matrix(
             self.city_locations
         ), dim=1)
 
-    def _partial_calculate_path_cost(self, a: int, b: int):
-        return sum(
-            scipy.spatial.distance.euclidean(
+    def partial_calc_path_cost(self, a: int, b: int):
+        return scipy.spatial.distance.euclidean(
                 self.city_locations[a], self.city_locations[b])
-        )
 
-    def _eval_beam_search(self, u: int, ll: int, branch: List[int], visited: Set[int], g: List[int], beam_size: int):
+    def _eval_beam_search(self, u: int, ll: int, branch: List[int], visited: Set[int], g: List[int], beam_size: int, cost_so_far: float = 0):
         visited.add(u)
         branch.append(u)
         if len(branch) == ll:  # if length of branch equals length of string, print the branch
             yield branch.copy()
         else:
             neighbours = [n for n in g if n not in visited]
-            # neighbours.sort()
-            for n in neighbours[:beam_size]:
-                yield from self._eval_beam_search(n, ll, branch, visited, g, beam_size)
+            travel_costs = [cost_so_far + self.partial_calc_path_cost(branch[-1], n) for n in neighbours]
+            neighbours_and_cost = sorted(zip(neighbours, travel_costs), key=lambda pair: pair[1])
+            
+            for n, cost in neighbours_and_cost[:beam_size]:
+                yield from self._eval_beam_search(n, ll, branch, visited, g, beam_size, cost_so_far+cost)
         # backtrack
         visited.remove(u)
         branch.remove(u)
@@ -56,6 +53,7 @@ class BeamSearchSolver(DefaultTSPSolver):
             )
             for path in (t := tqdm(path_generator, desc=display_path_cost(best_path_cost))):
                 cost = self._calculate_path_cost(path)
+                
                 if cost < best_path_cost:
                     best_path_cost = cost
                     self._send_result(path)
@@ -71,7 +69,8 @@ class BeamSearchSolver(DefaultTSPSolver):
 # pip install - e pyconcorde
 
 if __name__ == "__main__":
-    solver = BeamSearchSolver(address="10.90.185.46", port="8000")
+    # solver = BeamSearchSolver(address="10.90.185.46", port="8000")
+    solver = BeamSearchSolver()
     solver.run()
 
     # def beam_search(nodes: List[int], beam_size: int):

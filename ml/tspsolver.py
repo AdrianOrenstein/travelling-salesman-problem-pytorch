@@ -12,13 +12,17 @@ from tqdm.autonotebook import tqdm
 class DefaultTSPSolver:
     def __init__(
         self,
-        address,
-        port,
+        address: str = None,
+        port: str = None,
     ):
         self.address = address
         self.port = port
 
-        self._init_env(address, port)
+        if address != None and port != None:
+            self._init_env(address, port)
+        else:
+            np.random.seed(seed=0)
+            self.city_locations = np.random.rand(100, 2)
 
     def _init_env(self, address, port):
         response = requests.get(f"http://{address}:{port}/cities")
@@ -54,16 +58,17 @@ class DefaultTSPSolver:
         return normalised_adj_matrix
 
     def _send_result(self, path: List[int]):
-        data = {
-            "user_name": "adrian",
-            "algorithm_name": "beam_search",
-            "message": "imagine BFS but it\'s not guaranteed optimimum",
-            "city_order": path,
-        }
+        if self.address != None and self.port != None:
+            data = {
+                "user_name": "adrian",
+                "algorithm_name": "beam_search",
+                "message": "imagine BFS but it\'s not guaranteed optimimum",
+                "city_order": path,
+            }
 
-        response = requests.post(
-            f"http://{self.address}:{self.port}/submit", json=data
-        )
+            response = requests.post(
+                f"http://{self.address}:{self.port}/submit", json=data
+            )
 
     def run(self):
         path = list(range(len(self.city_locations)))

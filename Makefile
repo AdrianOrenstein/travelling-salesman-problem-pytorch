@@ -5,6 +5,10 @@ init:
 		@echo "Creating local conda env from yaml..."
 		conda init bash && \
 		source ~/miniconda3/etc/profile.d/conda.sh && \
+		git clone https://github.com/jvkersch/pyconcorde && \
+		cd pyconcorde && \
+		pip install -e . && \
+		cd .. && \
 		conda env create -f environment.yaml --prefix ./envs
 
 init_fresh:
@@ -15,8 +19,8 @@ init_fresh:
 		conda activate ./envs && \
 		conda install -yc pytorch pytorch torchvision cudatoolkit=10.1 && \
 		conda install -yc conda-forge pytorch-lightning tensorboard && \
-		conda install -c conda-forge pytorch_geometric && \
-		conda install -c anaconda cython && \
+		conda install -yc conda-forge pytorch_geometric && \
+		conda install -yc anaconda cython && \
 		git clone https://github.com/jvkersch/pyconcorde && \
 		cd pyconcorde && \
 		pip install -e . && \
