@@ -22,6 +22,12 @@ class BeamSearchSolver(DefaultTSPSolver):
             self.city_locations
         ), dim=1)
 
+    def _partial_calculate_path_cost(self, a: int, b: int):
+        return sum(
+            scipy.spatial.distance.euclidean(
+                self.city_locations[a], self.city_locations[b])
+        )
+
     def _eval_beam_search(self, u: int, ll: int, branch: List[int], visited: Set[int], g: List[int], beam_size: int):
         visited.add(u)
         branch.append(u)
@@ -29,24 +35,12 @@ class BeamSearchSolver(DefaultTSPSolver):
             yield branch.copy()
         else:
             neighbours = [n for n in g if n not in visited]
-            neighbours.sort()
+            # neighbours.sort()
             for n in neighbours[:beam_size]:
                 yield from self._eval_beam_search(n, ll, branch, visited, g, beam_size)
         # backtrack
         visited.remove(u)
         branch.remove(u)
-
-    def _send_result(self, path: List[int]):
-        data = {
-            "user_name": "adrian",
-            "algorithm_name": "beam_search",
-            "message": "imagine BFS but it\'s not guaranteed optimimum",
-            "city_order": path,
-        }
-
-        response = requests.post(
-            f"http://{self.address}:{self.port}/submit", json=data
-        )
 
     def run(self,):
         print(self.adjacency_matrix.shape)

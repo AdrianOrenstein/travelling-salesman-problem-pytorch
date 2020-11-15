@@ -53,6 +53,18 @@ class DefaultTSPSolver:
         normalised_adj_matrix = adjacency_matrix / adjacency_matrix.sum(1)
         return normalised_adj_matrix
 
+    def _send_result(self, path: List[int]):
+        data = {
+            "user_name": "adrian",
+            "algorithm_name": "beam_search",
+            "message": "imagine BFS but it\'s not guaranteed optimimum",
+            "city_order": path,
+        }
+
+        response = requests.post(
+            f"http://{self.address}:{self.port}/submit", json=data
+        )
+
     def run(self):
         path = list(range(len(self.city_locations)))
         best_path_cost = float("inf")
@@ -66,16 +78,7 @@ class DefaultTSPSolver:
 
             if current_cost < best_path_cost:
                 best_path_cost = current_cost
-                data = {
-                    "user_name": "adrian",
-                    "algorithm_name": "random",
-                    "message": "guaranteed global optima as time approaches ∞",
-                    "city_order": path,
-                }
-
-                response = requests.post(
-                    f"http://{self.address}:{self.port}/submit", json=data
-                )
+                self._send_result(path)
 
                 t.set_description(display_path_cost(best_path_cost))
                 t.refresh()  # to show immediately the update
