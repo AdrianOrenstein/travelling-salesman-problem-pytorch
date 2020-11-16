@@ -20,9 +20,6 @@ class DefaultTSPSolver:
 
         if address != None and port != None:
             self._init_env(address, port)
-        else:
-            np.random.seed(seed=0)
-            self.city_locations = np.random.rand(100, 2)
 
     def _init_env(self, address, port):
         response = requests.get(f"http://{address}:{port}/cities")
@@ -57,12 +54,15 @@ class DefaultTSPSolver:
         normalised_adj_matrix = adjacency_matrix / adjacency_matrix.sum(1)
         return normalised_adj_matrix
 
-    def _send_result(self, path: List[int]):
+    def _send_result(self, path: List[int], user_name=None, algorithm_name=None, message=None):
+        user_name = user_name if user_name else 'adrian'
+        algorithm_name = algorithm_name if algorithm_name else 'heuristic_bfs'
+        message = message if message else ''
         if self.address != None and self.port != None:
             data = {
-                "user_name": "adrian",
-                "algorithm_name": "beam_search",
-                "message": "imagine BFS but it\'s not guaranteed optimimum",
+                "user_name": user_name,
+                "algorithm_name": algorithm_name,
+                "message": message,
                 "city_order": path,
             }
 
@@ -70,7 +70,9 @@ class DefaultTSPSolver:
                 f"http://{self.address}:{self.port}/submit", json=data
             )
 
-    def run(self):
+    def run(self, city_locations: List[List[float]] = None, ):
+
+        self.city_locations = np.array(city_locations if type(city_locations) != None else self.city_locations)
         path = list(range(len(self.city_locations)))
         best_path_cost = float("inf")
 

@@ -14,3 +14,7 @@ data/
 .ipynb_checkpoints/
 
 pyconcorde/
+
+train_heuristic/lightning_logs/
+
+project.egg-info/
