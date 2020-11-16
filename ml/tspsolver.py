@@ -11,9 +11,7 @@ from tqdm.autonotebook import tqdm
 
 class DefaultTSPSolver:
     def __init__(
-        self,
-        address: str = None,
-        port: str = None,
+        self, address: str = None, port: str = None,
     ):
         self.address = address
         self.port = port
@@ -26,17 +24,24 @@ class DefaultTSPSolver:
 
         self.city_locations = response.json()["city_locations"]
 
-    def _calculate_path_cost(self, city_indexes: List[Union[float, int]]):
+    def _calculate_path_cost(self, city_indexes: List[Union[float, int]], ):
         return sum(
             scipy.spatial.distance.euclidean(
-                self.city_locations[a], self.city_locations[b])
+                self.city_locations[a], self.city_locations[b]
+            )
             for a, b in zip(
-                city_indexes + [city_indexes[-1]],
-                city_indexes[1:] + [city_indexes[0]]
+                city_indexes + [city_indexes[-1]], city_indexes[1:] + [city_indexes[0]]
             )
         )
 
-    def _build_adjacency_matrix(self, locations: List[List[Union[float, int]]]) -> torch.FloatTensor:
+    def _partial_calc_path_cost(self, a: int, b: int):
+        return scipy.spatial.distance.euclidean(
+            self.city_locations[a], self.city_locations[b]
+        )
+
+    def _build_adjacency_matrix(
+        self, locations: List[List[Union[float, int]]]
+    ) -> torch.FloatTensor:
         """
 
         """
@@ -46,7 +51,9 @@ class DefaultTSPSolver:
 
         return torch.FloatTensor(adj_matrix)
 
-    def _normalise_city_distances(self, adjacency_matrix: torch.FloatTensor) -> torch.FloatTensor:
+    def _normalise_city_distances(
+        self, adjacency_matrix: torch.FloatTensor
+    ) -> torch.FloatTensor:
         """
         Normalise distances between 0 and 1
 
@@ -54,10 +61,12 @@ class DefaultTSPSolver:
         normalised_adj_matrix = adjacency_matrix / adjacency_matrix.sum(1)
         return normalised_adj_matrix
 
-    def _send_result(self, path: List[int], user_name=None, algorithm_name=None, message=None):
-        user_name = user_name if user_name else 'adrian'
-        algorithm_name = algorithm_name if algorithm_name else 'heuristic_bfs'
-        message = message if message else ''
+    def _send_result(
+        self, path: List[int], user_name=None, algorithm_name=None, message=None
+    ):
+        user_name = user_name if user_name else "adrian"
+        algorithm_name = algorithm_name if algorithm_name else "heuristic_bfs"
+        message = message if message else ""
         if self.address != None and self.port != None:
             data = {
                 "user_name": user_name,
@@ -70,15 +79,19 @@ class DefaultTSPSolver:
                 f"http://{self.address}:{self.port}/submit", json=data
             )
 
-    def run(self, city_locations: List[List[float]] = None, ):
+    def run(
+        self, city_locations: List[List[float]] = None,
+    ):
 
-        self.city_locations = np.array(city_locations if type(city_locations) != None else self.city_locations)
+        self.city_locations = np.array(
+            city_locations if type(city_locations) != None else self.city_locations
+        )
         path = list(range(len(self.city_locations)))
         best_path_cost = float("inf")
 
         display_path_cost = lambda cost: f"best path cost so far: {cost:.3f}"
 
-        for _ in (t := tqdm(range(100000), desc=display_path_cost(best_path_cost))):
+        for _ in (t := tqdm(range(100000), desc=display_path_cost(best_path_cost))) :
             random.shuffle(path)
 
             current_cost = self._calculate_path_cost(path)
