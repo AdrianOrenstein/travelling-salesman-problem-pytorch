@@ -1,4 +1,4 @@
-from typing import *
+from typing import List, Dict
 
 import numpy as np
 import requests
@@ -10,9 +10,7 @@ from tqdm.autonotebook import tqdm
 from ml.tspsolver import DefaultTSPSolver
 from train_heuristic.data_generation import ConcordeSolver
 import matplotlib.pyplot as plt
-import concurrent.futures
 
-from functools import partial
 
 
 class BeamSearchSolver(DefaultTSPSolver):
@@ -128,11 +126,6 @@ class BeamSearchSolver(DefaultTSPSolver):
 
                         t.set_description(display_path_cost(best_path_cost))
         return best_path
-
-
-# conda install -c anaconda cython
-# git clone https: // github.com / jvkersch / pyconcorde
-# pip install - e pyconcorde
 
 if __name__ == "__main__":
     solver = BeamSearchSolver(address="10.90.185.46", port="8000")
