@@ -18,3 +18,11 @@ pyconcorde/
 train_heuristic/lightning_logs/
 
 project.egg-info/
+
+*.pul
+
+*.sav
+
+*.pul~
+
+*.sav~
