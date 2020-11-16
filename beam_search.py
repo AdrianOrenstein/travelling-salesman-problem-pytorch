@@ -1,3 +1,5 @@
+import multiprocessing as mp
+from argparse import ArgumentParser
 from typing import Dict, List, Set
 
 import matplotlib.pyplot as plt
@@ -10,8 +12,7 @@ from tqdm.autonotebook import tqdm
 
 from ml.tspsolver import DefaultTSPSolver
 from train_heuristic.generate_data import ConcordeSolver
-
-from argparse import ArgumentParser
+from functools import partial
 
 
 class BeamSearchSolver(DefaultTSPSolver):
@@ -53,39 +54,81 @@ class BeamSearchSolver(DefaultTSPSolver):
     def _gen_candidates(self, sequence_i, row):
         candidates = []
         seq, score = sequence_i
-        for j in range(len(row)):
-            if j not in sequence_i[0]:
-                if seq == []:
-                    candidate = [seq + [j], 0]
-                else:
-                    candidate = [
-                        seq + [j],
-                        score + self._partial_calc_path_cost(seq[-1], j),
-                    ]
-                candidates.append(candidate)
+
+        available_nodes = (n for n in range(len(row)) if n not in sequence_i[0])
+        for j in available_nodes:
+            if seq == []:
+                candidate = [seq + [j], 0]
+            else:
+                candidate = [
+                    seq + [j],
+                    score + self._partial_calc_path_cost(seq[-1], j),
+                ]
+            candidates.append(candidate)
         return candidates
 
-    def beam_search_decoder(self, data, k):
+    def beam_search_decoder(self, data: np.array, k: int, compute_method: str):
         sequences = [[list(), -float("inf")]]
         # read all files in many threads
-        threading = False
 
-        # for each depth
-        for row in tqdm(data):
-            all_candidates = list()
-            # expand each current candidate
-            for i in range(len(sequences)):
-                all_candidates.extend(self._gen_candidates(sequences[i], row))
-            # order all candidates by score
-            ordered = sorted(all_candidates, key=lambda tup: tup[1], reverse=False)
-            # select k best
-            sequences = ordered[:k]
+        print(f"\nk: {k}, {compute_method}")
+
+        if compute_method == "seq":
+            # for each depth
+            for row in tqdm(data, desc="depth"):
+                all_candidates = list()
+                # expand each current candidate
+                for i in range(len(sequences)):
+                    all_candidates.extend(self._gen_candidates(sequences[i], row))
+        else:
+            with mp.Pool() as pool:
+                # for each depth
+                for row in tqdm(data, desc="depth"):
+                    all_candidates = list()
+
+                    if compute_method == "map":
+                        func = partial(self._gen_candidates, row=row)
+                        multiple_results = [
+                            pool.map_async(
+                                func,
+                                (sequences[i] for i in range(len(sequences))),
+                                # chunksize=len(all_candidates) // 48,
+                            )
+                        ]
+
+                        for res in (res.get() for res in multiple_results):
+                            for chunk in res:
+                                all_candidates.extend(chunk)
+
+                    elif compute_method == "apply":
+                        multiple_results = [
+                            pool.apply_async(self._gen_candidates, [sequences[i], row])
+                            for i in range(len(sequences))
+                        ]
+
+                        for res in (res.get() for res in multiple_results):
+                            all_candidates.extend(res)
+                    else:
+                        assert False, f'pick: {["seq", "map", "apply"]}'
+
+                    # order all candidates by score
+                    ordered = sorted(
+                        all_candidates, key=lambda tup: tup[1], reverse=False
+                    )
+                    # select k best
+                    sequences = ordered[:k]
 
         for res in sequences:
             yield res[0]
 
-    def run(self, city_locations: List[List[float]] = None, algorithm="beam_search"):
-        if type(city_locations) is None:
+    def run(
+        self,
+        city_locations: List[List[float]] = None,
+        algorithm="beam_search",
+        beam_size=250,
+        compute_method="apply",
+    ):
+        if type(city_locations) == type(None):
             self.city_locations = np.array(self.city_locations)
         else:
             self.city_locations = np.array(city_locations)
@@ -100,7 +143,9 @@ class BeamSearchSolver(DefaultTSPSolver):
         best_path = None
 
         if algorithm == "beam_search":
-            path_generator = self.beam_search_decoder(self.adjacency_matrix, 200)
+            path_generator = self.beam_search_decoder(
+                self.adjacency_matrix, beam_size, compute_method
+            )
             for path in (
                 t := tqdm(path_generator, desc=display_path_cost(best_path_cost))
             ) :
@@ -111,7 +156,7 @@ class BeamSearchSolver(DefaultTSPSolver):
                     best_path_cost = cost
                     best_path = path
 
-                    if type(city_locations) is None:
+                    if type(city_locations) == type(None):
                         self._send_result(path)
 
                     t.set_description(display_path_cost(best_path_cost))
@@ -125,7 +170,7 @@ class BeamSearchSolver(DefaultTSPSolver):
                     branch,
                     visited,
                     list(range(len(self.adjacency_matrix))),
-                    5,
+                    beam_size,
                     best_cost=best_path_cost,
                 )
                 for path in (
@@ -145,20 +190,35 @@ class BeamSearchSolver(DefaultTSPSolver):
         return best_path
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--address", default="10.90.185.46", type=str)
     parser.add_argument("--port", default="8000", type=str)
     parser.add_argument("--gpus", default=1, type=int)
     parser.add_argument("--algorithm", default="beam_search", type=str)
-    parser.add_argument("--dev", default=True, type=bool)
+    parser.add_argument(
+        "-dev", type=str2bool, nargs="?", const=True, default=False,
+    )
     args = parser.parse_args()
+
+    print(args.dev)
 
     if args.dev == True:
         # for range of nodes, assert that brute force is better than concorde
-        for city_locations in (np.random.rand(i, 2) for i in range(80, 100 + 1, 10)):
-            solver = BeamSearchSolver(address="10.90.185.46", port="8000")
-            optimum = ConcordeSolver(address="10.90.185.46", port="8000")
+        for city_locations in (np.random.rand(i, 2) for i in range(20, 100 + 1, 10)):
+            solver = BeamSearchSolver()
+            optimum = ConcordeSolver()
             # solver = BeamSearchSolver()
             solver_res = solver.run(city_locations, algorithm=args.algorithm)
             solver_cost = solver._calculate_path_cost(solver_res)
@@ -170,5 +230,7 @@ if __name__ == "__main__":
                 solver_cost <= opt_cost
             ), f"\n{solver_res}\n{opt_res}\n{len(city_locations)}\n{solver_cost} {opt_cost}"
     else:
-        solver = BeamSearchSolver(address=args.address, port=args.port)
-        solver.run(algorithm=args.algorithm)  # 'dfs'
+        while True:
+            solver = BeamSearchSolver(address=args.address, port=args.port)
+            solver.run(algorithm=args.algorithm, compute_method="apply")
+

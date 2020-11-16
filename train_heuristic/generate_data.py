@@ -1,23 +1,22 @@
+import multiprocessing as mp
+import pickle
 import random
 import time
-import multiprocessing as mp
 from typing import *
 
 import numpy as np
 import requests
 import torch
-from concorde.tsp import TSPSolver
 from concorde.tests.data_utils import get_dataset_path
+from concorde.tsp import TSPSolver
+from ml.tspsolver import DefaultTSPSolver
 from scipy.spatial import distance
 from tqdm.autonotebook import tqdm
 
-from ml.tspsolver import DefaultTSPSolver
-
-import pickle
-
 
 class ConcordeSolver(DefaultTSPSolver):
-    def _generate_sample(self, idx: int, dims: int) -> dict:
+    def _generate_sample(self, idx: int, dims: int, seed: int) -> dict:
+        np.random.seed(seed=seed)
         self.city_locations = np.random.rand(dims, 2)
 
         solver = TSPSolver.from_data(
@@ -38,22 +37,26 @@ class ConcordeSolver(DefaultTSPSolver):
 
         return data, idx
 
-    def generate_data(self, data_dir: str, starting_seed: int):
+    def generate_data(self, data_dir: str, starting_seed: int, amount: int = 10000):
         # city_locations = np.array(self.city_locations)
         np.random.seed(seed=starting_seed)
-        dims = 60
 
         with mp.Pool() as pool:
 
             multiple_results = [
-                pool.apply_async(self._generate_sample, [i, dims])
-                for i in range(1, 10000 + 1)
+                pool.apply_async(self._generate_sample, [i, dim, starting_seed + i])
+                for i, dim in zip(
+                    range(1, amount + 1),
+                    np.random.randint(low=15, high=1000 + 1, size=amount),
+                )
             ]
 
             for res in (res.get() for res in multiple_results):
                 data, idx = res
 
-                with open(data_dir + f"/c{dims}d2_{idx}.pkl", "wb") as handle:
+                with open(
+                    data_dir + f"/c{len(data['solution'])}d2_{idx}.pkl", "wb"
+                ) as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def run(self, city_locations: List[List[float]], submit=False):
