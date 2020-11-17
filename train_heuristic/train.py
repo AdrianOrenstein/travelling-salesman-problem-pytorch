@@ -14,6 +14,7 @@ from pytorch_lightning.metrics import functional
 from scipy import spatial
 from torch import nn
 from torch.nn import functional as F
+from torchvision.models.resnet import ResNet, BasicBlock, resnet18, resnet34
 
 
 class TSPClassifier(pl.LightningModule):
@@ -23,16 +24,49 @@ class TSPClassifier(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.model = UnetModel(
-            in_chans=in_ch,
-            out_chans=1,
-            chans=hidden_dim,
-            num_pool_layers=3,
-            drop_prob=0.2,
-            bilinear=True,
-        )
+        # unet
+        # self.model = UnetModel(
+        #     in_chans=in_ch,
+        #     out_chans=1,
+        #     chans=hidden_dim,
+        #     num_pool_layers=3,
+        #     drop_prob=0.2,
+        #     bilinear=True,
+        # )
 
-        self.loss = nn.BCEWithLogitsLoss()
+        # resnet
+        # resnet = resnet34()
+        # layers = [nn.Conv2d(1, 512, (3, 3), padding=1)]
+        # layers.extend(
+        #     [nn.Sequential(resnet._make_layer(block=BasicBlock, planes=32, blocks=50))]
+        # )
+        # layers.append(nn.Conv2d(32, 1, (1, 1),))
+
+        # transformer
+        from linear_attention_transformer.images import ImageLinearAttention
+        from linear_attention_transformer.linear_attention_transformer import PreNorm
+
+        layers = [
+            nn.Sequential(nn.Conv2d(1, 32, (3, 3), padding=1), nn.BatchNorm2d(32),)
+        ]
+
+        layers.extend(
+            [
+                nn.Sequential(
+                    ImageLinearAttention(
+                        chan=32,
+                        heads=8,
+                        key_dim=64,  # can be decreased to 32 for more memory savings
+                    ),
+                    nn.BatchNorm2d(32),
+                )
+                for _ in range(2)
+            ]
+        )
+        layers.append(nn.Conv2d(32, 1, (1, 1),))
+
+        self.model = nn.Sequential(*layers)
+        self.loss = nn.BCELoss()
 
         self.metrics = {
             # "accuracy": functional.classification.accuracy,
@@ -42,7 +76,7 @@ class TSPClassifier(pl.LightningModule):
 
     def forward(self, x):
         # print(f'forward.shape {x.shape}')
-        return self.model(x)
+        return torch.sigmoid(self.model(x))
 
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -56,17 +90,28 @@ class TSPClassifier(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = self.loss(y_hat, y)
-        y_hat = y_hat > 0.5
+        metric_y_hat = y_hat > 0.5
         self.log("2_val/val_loss", loss)
 
         for metric_name, metric_function in self.metrics.items():
             self.log(
                 f"2_val/{metric_name}",
-                metric_function(pred=y_hat, target=y, num_classes=2),
+                metric_function(pred=metric_y_hat, target=y, num_classes=2),
             )
 
+        if batch_idx == 0:
+            for i, (x_s, y_s, y_hat_s) in enumerate(zip(x, y, y_hat)):
+                img = torch.dstack([x_s, y_s, y_hat_s])
+                self.logger.experiment.add_image("2_val/img", img, self.global_step)
+                break
+
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        opt = torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        # sch = torch.optim.lr_scheduler.StepLR(opt, step_size=100, gamma=0.1)
+        sch = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            opt, factor=0.1, min_lr=1e-6, patience=50, verbose=True
+        )
+        return {"optimizer": opt, "lr_scheduler": sch, "monitor": "2_val/val_loss"}
 
 
 class TSPDataset(torch.utils.data.Dataset):
@@ -120,10 +165,10 @@ class TSPDataModule(pl.LightningDataModule):
         yy = [t[1] for t in batch]
         A, B = max(x.shape for x in xx)[1:]
 
-        def padd(tensor, A, B, channel_first):
+        def padd(in_tensors, A, B, channel_first):
             tensors = []
 
-            for tensor in xx:
+            for tensor in in_tensors:
                 _, C, D = tensor.shape
                 if channel_first:
                     tensor = tensor.transpose(0, -1)
@@ -181,14 +226,14 @@ def cli_main():
     # args
     parser = ArgumentParser()
     parser.add_argument("--gpus", default=2, type=int)
-    parser.add_argument("--experiment_name", default="unet_concorde", type=str)
+    parser.add_argument("--experiment_name", default="linformer_concorde", type=str)
     args = parser.parse_args()
 
     # data
     data_module = TSPDataModule(
         training_data_dir="/home/adrian/projects/travelling-salesman-problem-pytorch/train_heuristic/data/training",
         val_data_dir="/home/adrian/projects/travelling-salesman-problem-pytorch/train_heuristic/data/validation",
-        batch_size=4,
+        batch_size=64,
     )
 
     # model
@@ -204,7 +249,8 @@ def cli_main():
         logger=logger,
         gpus=args.gpus,
         distributed_backend="ddp",
-        accumulate_grad_batches=8,
+        # accumulate_grad_batches=4,
+        # precision=16,
     )
     trainer.fit(model, data_module)
 

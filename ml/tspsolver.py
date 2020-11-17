@@ -24,7 +24,9 @@ class DefaultTSPSolver:
 
         self.city_locations = response.json()["city_locations"]
 
-    def _calculate_path_cost(self, city_indexes: List[Union[float, int]], ):
+    def _calculate_path_cost(
+        self, city_indexes: List[Union[float, int]],
+    ):
         return sum(
             scipy.spatial.distance.euclidean(
                 self.city_locations[a], self.city_locations[b]
@@ -78,6 +80,8 @@ class DefaultTSPSolver:
             response = requests.post(
                 f"http://{self.address}:{self.port}/submit", json=data
             )
+
+            print("submitted with", response, "data: ", data)
 
     def run(
         self, city_locations: List[List[float]] = None,

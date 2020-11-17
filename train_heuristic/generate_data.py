@@ -47,7 +47,7 @@ class ConcordeSolver(DefaultTSPSolver):
                 pool.apply_async(self._generate_sample, [i, dim, starting_seed + i])
                 for i, dim in zip(
                     range(1, amount + 1),
-                    np.random.randint(low=15, high=1000 + 1, size=amount),
+                    np.random.randint(low=15, high=50 + 1, size=amount),
                 )
             ]
 
@@ -88,10 +88,12 @@ if __name__ == "__main__":
     solver.generate_data(
         data_dir="/home/adrian/projects/travelling-salesman-problem-pytorch/train_heuristic/data/training",
         starting_seed=12345678,
+        amount=10000,
     )
     solver.generate_data(
         data_dir="/home/adrian/projects/travelling-salesman-problem-pytorch/train_heuristic/data/validation",
         starting_seed=93939393,
+        amount=1000,
     )
 
     # solver.solve(submit=False)

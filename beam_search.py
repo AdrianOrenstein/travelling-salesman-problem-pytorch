@@ -51,7 +51,7 @@ class BeamSearchSolver(DefaultTSPSolver):
         visited[u] = False
         branch.remove(u)
 
-    def _gen_candidates(self, sequence_i, row):
+    def _gen_candidates(self, sequence_i, row, k):
         candidates = []
         seq, score = sequence_i
 
@@ -65,7 +65,9 @@ class BeamSearchSolver(DefaultTSPSolver):
                     score + self._partial_calc_path_cost(seq[-1], j),
                 ]
             candidates.append(candidate)
-        return candidates
+
+        candidates.sort(key=lambda tup: tup[1], reverse=False)
+        return candidates[:20]
 
     def beam_search_decoder(self, data: np.array, k: int, compute_method: str):
         sequences = [[list(), -float("inf")]]
@@ -79,7 +81,7 @@ class BeamSearchSolver(DefaultTSPSolver):
                 all_candidates = list()
                 # expand each current candidate
                 for i in range(len(sequences)):
-                    all_candidates.extend(self._gen_candidates(sequences[i], row))
+                    all_candidates.extend(self._gen_candidates(sequences[i], row, k))
         else:
             with mp.Pool() as pool:
                 # for each depth
@@ -87,7 +89,7 @@ class BeamSearchSolver(DefaultTSPSolver):
                     all_candidates = list()
 
                     if compute_method == "map":
-                        func = partial(self._gen_candidates, row=row)
+                        func = partial(self._gen_candidates, row=row, k=k)
                         multiple_results = [
                             pool.map_async(
                                 func,
@@ -102,7 +104,9 @@ class BeamSearchSolver(DefaultTSPSolver):
 
                     elif compute_method == "apply":
                         multiple_results = [
-                            pool.apply_async(self._gen_candidates, [sequences[i], row])
+                            pool.apply_async(
+                                self._gen_candidates, [sequences[i], row, k]
+                            )
                             for i in range(len(sequences))
                         ]
 
@@ -111,12 +115,10 @@ class BeamSearchSolver(DefaultTSPSolver):
                     else:
                         assert False, f'pick: {["seq", "map", "apply"]}'
 
-                    # order all candidates by score
-                    ordered = sorted(
-                        all_candidates, key=lambda tup: tup[1], reverse=False
-                    )
+                    all_candidates.sort(key=lambda tup: tup[1], reverse=False)
+
                     # select k best
-                    sequences = ordered[:k]
+                    sequences = all_candidates[:k]
 
         for res in sequences:
             yield res[0]
@@ -187,7 +189,7 @@ class BeamSearchSolver(DefaultTSPSolver):
                             self._send_result(path)
 
                         t.set_description(display_path_cost(best_path_cost))
-        return best_path
+        return best_path, best_path_cost
 
 
 def str2bool(v):
@@ -230,7 +232,9 @@ if __name__ == "__main__":
                 solver_cost <= opt_cost
             ), f"\n{solver_res}\n{opt_res}\n{len(city_locations)}\n{solver_cost} {opt_cost}"
     else:
-        while True:
-            solver = BeamSearchSolver(address=args.address, port=args.port)
-            solver.run(algorithm=args.algorithm, compute_method="apply")
+        solver = BeamSearchSolver(address=args.address, port=args.port)
+        best_path, best_cost = solver.run(
+            algorithm=args.algorithm, compute_method="apply", beam_size=10000
+        )
+        print(best_cost, best_path)
 
