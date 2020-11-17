@@ -152,6 +152,7 @@ class BeamSearchSolver(DefaultTSPSolver):
                 t := tqdm(path_generator, desc=display_path_cost(best_path_cost))
             ) :
                 assert len(set(path)) == len(path)
+
                 cost = self._calculate_path_cost(path)
 
                 if cost < best_path_cost:
@@ -222,19 +223,21 @@ if __name__ == "__main__":
             solver = BeamSearchSolver()
             optimum = ConcordeSolver()
             # solver = BeamSearchSolver()
-            solver_res = solver.run(city_locations, algorithm=args.algorithm)
-            solver_cost = solver._calculate_path_cost(solver_res)
+            best_path, best_path_cost = solver.run(
+                city_locations, algorithm=args.algorithm
+            )
+            solver_cost = solver._calculate_path_cost(best_path)
 
             opt_res = optimum.run(city_locations)
             opt_cost = solver._calculate_path_cost(opt_res)
             print(solver_cost, opt_cost)
             assert (
                 solver_cost <= opt_cost
-            ), f"\n{solver_res}\n{opt_res}\n{len(city_locations)}\n{solver_cost} {opt_cost}"
+            ), f"\n{best_path_cost}\n{opt_res}\n{len(city_locations)}\n{solver_cost} {opt_cost}"
     else:
         solver = BeamSearchSolver(address=args.address, port=args.port)
         best_path, best_cost = solver.run(
-            algorithm=args.algorithm, compute_method="apply", beam_size=10000
+            algorithm=args.algorithm, compute_method="apply", beam_size=1000
         )
         print(best_cost, best_path)
 
