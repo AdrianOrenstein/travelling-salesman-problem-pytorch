@@ -4,17 +4,40 @@ import pickle
 from argparse import ArgumentParser
 from typing import List
 
-import matplotlib.pyplot
 import matplotlib.pyplot as plt
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from ml.unet import UnetModel
+from einops import asnumpy, parse_shape, rearrange, reduce
+from einops.layers.torch import Rearrange, Reduce
+from linear_attention_transformer.linear_attention_transformer import (
+    LinearAttentionTransformer,
+)
 from pytorch_lightning.metrics import functional
 from scipy import spatial
 from torch import nn
 from torch.nn import functional as F
-from torchvision.models.resnet import ResNet, BasicBlock, resnet18, resnet34
+
+
+class LinearTransformer(nn.Module):
+    def __init__(self,):
+        super().__init__()
+
+        self.proj_in = nn.Conv2d(1, 32, (1, 1))
+        self.proj_out = nn.Conv2d(32, 1, (1, 1))
+
+        self.transformer = LinearAttentionTransformer(
+            dim=32, heads=2, depth=4, max_seq_len=500 * 500, one_kv_head=True,
+        )
+
+    def forward(self, x):
+        x = self.proj_in(x)
+        B, C, H, W = x.shape
+        x = rearrange(x, "b c h w -> b (h w) c")
+        x = self.transformer(x)
+        x = rearrange(x, "b (h w) c -> b c h w", h=H, w=W)
+        x = self.proj_out(x)
+        return x
 
 
 class TSPClassifier(pl.LightningModule):
@@ -24,48 +47,7 @@ class TSPClassifier(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        # unet
-        # self.model = UnetModel(
-        #     in_chans=in_ch,
-        #     out_chans=1,
-        #     chans=hidden_dim,
-        #     num_pool_layers=3,
-        #     drop_prob=0.2,
-        #     bilinear=True,
-        # )
-
-        # resnet
-        # resnet = resnet34()
-        # layers = [nn.Conv2d(1, 512, (3, 3), padding=1)]
-        # layers.extend(
-        #     [nn.Sequential(resnet._make_layer(block=BasicBlock, planes=32, blocks=50))]
-        # )
-        # layers.append(nn.Conv2d(32, 1, (1, 1),))
-
-        # transformer
-        from linear_attention_transformer.images import ImageLinearAttention
-        from linear_attention_transformer.linear_attention_transformer import PreNorm
-
-        layers = [
-            nn.Sequential(nn.Conv2d(1, 32, (3, 3), padding=1), nn.BatchNorm2d(32),)
-        ]
-
-        layers.extend(
-            [
-                nn.Sequential(
-                    ImageLinearAttention(
-                        chan=32,
-                        heads=8,
-                        key_dim=64,  # can be decreased to 32 for more memory savings
-                    ),
-                    nn.BatchNorm2d(32),
-                )
-                for _ in range(2)
-            ]
-        )
-        layers.append(nn.Conv2d(32, 1, (1, 1),))
-
-        self.model = nn.Sequential(*layers)
+        self.model = LinearTransformer()
         self.loss = nn.BCELoss()
 
         self.metrics = {

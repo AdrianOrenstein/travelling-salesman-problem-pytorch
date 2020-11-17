@@ -21,7 +21,7 @@ init_fresh:
 		conda install -yc conda-forge pytorch-lightning tensorboard && \
 		conda install -yc conda-forge pytorch_geometric && \
 		conda install -yc anaconda cython && \
-		pip install test-tube && \
+		pip install test-tube einops && \
 		git clone https://github.com/jvkersch/pyconcorde && \
 		cd pyconcorde && \
 		pip install -e . && \
