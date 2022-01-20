@@ -1,0 +1,1 @@
+docker build -t adrianorenstein/tsp -f dockerfiles/Dockerfile .
