@@ -1,4 +1,3 @@
-# FROM pytorch/pytorch:1.9.1-cuda11.1-cudnn8-devel
 FROM nvidia/cuda:11.1-devel-ubuntu20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -19,12 +18,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a working directory
-RUN mkdir /app
-WORKDIR /app
+RUN mkdir /tsp
+WORKDIR /tsp
 
 # Create a non-root user and switch to it
 RUN adduser --disabled-password --gecos '' --shell /bin/bash user && \ 
-    chown -R user:user /app
+    chown -R user:user /tsp
 RUN echo "user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-user
 USER user
 
@@ -55,7 +54,7 @@ RUN pip install --user --no-cache-dir -r /etc/test_requirements.txt
 RUN pip install mlflow
 
 # install self as module
-COPY ./setup.py /app/setup.py
+COPY ./setup.py /tsp/setup.py
 RUN pip install --user --no-cache-dir -e .
 
 # project specifics
