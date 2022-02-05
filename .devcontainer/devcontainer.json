@@ -1,0 +1,7 @@
+{
+    "image": "adrianorenstein/tsp:latest",
+
+	"runArgs": [
+        "--gpus", "all",
+        "--ipc", "host",
+    ],
